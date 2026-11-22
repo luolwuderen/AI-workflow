@@ -34,7 +34,8 @@ public final class NodeCatalog {
                 knowledgeRetrievalSchema(), obj("datasetIds", List.of(), "query", "{{start.text}}",
                         "topK", 4, "scoreThreshold", 0.0),
                 outputs(obj("result", obj("type", "array")), obj("context", obj("type", "string")),
-                        obj("count", obj("type", "number")))));
+                        obj("count", obj("type", "number"))),
+                obj("datasetIds", obj("ui:widget", "knowledge"))));
         register(values, executable("answer", "Answer", "替换变量并流式返回聊天答案。", "输出", CHATFLOW,
                 schema(obj("answer", obj("type", "string", "title", "答案模板")), List.of("answer")),
                 obj("answer", ""), outputs(obj("answer", obj("type", "string")))));

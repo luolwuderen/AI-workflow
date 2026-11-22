@@ -1,8 +1,11 @@
 package com.acme.platform.service;
 
 import com.acme.platform.api.KnowledgeBaseView;
+import com.acme.platform.api.KnowledgeDocumentDetailView;
 import com.acme.platform.api.KnowledgeDocumentView;
+import com.acme.platform.api.KnowledgeSearchHitView;
 import com.acme.workflow.infra.knowledge.KnowledgeIngestionService;
+import com.acme.workflow.infra.knowledge.KnowledgeQueryService;
 import com.acme.workflow.infra.persistence.KnowledgeBaseEntity;
 import com.acme.workflow.infra.persistence.KnowledgeBaseRepository;
 import com.acme.workflow.infra.persistence.KnowledgeChunkRepository;
@@ -22,12 +25,15 @@ public class KnowledgeBaseService {
     private final KnowledgeDocumentRepository documents;
     private final KnowledgeChunkRepository chunks;
     private final KnowledgeIngestionService ingestion;
+    private final KnowledgeQueryService queries;
     private final int dimensions;
 
     public KnowledgeBaseService(KnowledgeBaseRepository bases, KnowledgeDocumentRepository documents,
                                 KnowledgeChunkRepository chunks, KnowledgeIngestionService ingestion,
+                                KnowledgeQueryService queries,
                                 @Value("${spring.ai.openai.embedding.dimensions:1536}") int dimensions) {
         this.bases = bases; this.documents = documents; this.chunks = chunks; this.ingestion = ingestion;
+        this.queries = queries;
         this.dimensions = dimensions;
     }
 
@@ -64,6 +70,23 @@ public class KnowledgeBaseService {
 
     public KnowledgeDocumentView addDocument(String knowledgeBaseId, String name, String content) {
         return view(ingestion.ingest(knowledgeBaseId, name, content));
+    }
+
+    public KnowledgeDocumentDetailView document(String knowledgeBaseId, String documentId) {
+        base(knowledgeBaseId);
+        KnowledgeDocumentEntity document = documents.findById(documentId)
+                .filter(item -> knowledgeBaseId.equals(item.getKnowledgeBaseId()))
+                .orElseThrow(() -> new NotFoundException("文档不存在：" + documentId));
+        return new KnowledgeDocumentDetailView(document.getId(), document.getKnowledgeBaseId(), document.getName(),
+                document.getContent(), document.getChunkCount(), document.getCreatedAt());
+    }
+
+    public List<KnowledgeSearchHitView> search(List<String> knowledgeBaseIds, String query, int topK,
+                                               double threshold) {
+        return queries.search(knowledgeBaseIds, query, topK, threshold).stream()
+                .map(hit -> new KnowledgeSearchHitView(hit.knowledgeBaseId(), hit.documentId(), hit.documentName(),
+                        hit.content(), hit.chunkIndex(), hit.score()))
+                .toList();
     }
 
     @Transactional

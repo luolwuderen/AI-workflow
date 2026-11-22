@@ -411,6 +411,28 @@ test('知识检索命中文档并把上下文传给下游', async ({ page, reque
   await createApp(request, name, 'WORKFLOW', graph);
   await openApp(page, name);
 
+  // 知识库面板可直接查看文档正文
+  await page.getByTestId('open-knowledge').click();
+  await expect(page.getByTestId('knowledge-panel')).toBeVisible();
+  await page.getByTestId('knowledge-panel').getByText(knowledgeName, { exact: true }).click();
+  await page.getByTestId('document-toggle').first().click();
+  await expect(page.getByTestId('document-detail')).toContainText('苹果是一种常见水果');
+  await page.getByTestId('close-knowledge').click();
+
+  // 节点内可视化选择知识库，并可即时测试检索
+  await page.locator('[data-node-id="retrieval"]').click();
+  const knowledgeSelect = page.getByTestId('knowledge-select');
+  await expect(knowledgeSelect).toContainText(knowledgeName);
+  await expect(knowledgeSelect).toContainText('已选 1 个知识库');
+  const firstBase = knowledgeSelect.locator('input[type="checkbox"]').first();
+  await firstBase.uncheck();
+  await expect(knowledgeSelect).toContainText('已选 0 个知识库');
+  await firstBase.check();
+  await expect(knowledgeSelect).toContainText('已选 1 个知识库');
+  await page.getByTestId('retrieval-test-query').fill('苹果');
+  await page.getByTestId('retrieval-test').getByRole('button', { name: '测试' }).click();
+  await expect(page.getByTestId('retrieval-test')).toContainText('水果简介');
+
   await execute(page, '苹果');
   await expect(page.getByTestId('run-result')).toContainText('苹果是一种常见水果');
   await expect(page.locator('[data-node-id="retrieval"]')).toHaveClass(/status-succeeded/);

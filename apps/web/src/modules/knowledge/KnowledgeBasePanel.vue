@@ -23,6 +23,9 @@ const newName = ref('')
 const newDescription = ref('')
 const documentName = ref('')
 const documentContent = ref('')
+const openedId = ref<string | null>(null)
+const openedContent = ref('')
+const detailLoading = ref(false)
 
 function fail(cause: unknown) {
   error.value = cause instanceof Error ? cause.message : String(cause)
@@ -43,11 +46,35 @@ async function loadBases() {
 async function selectBase(base: KnowledgeBase) {
   selected.value = base
   documents.value = []
+  openedId.value = null
+  openedContent.value = ''
   error.value = ''
   try {
     documents.value = await knowledgeApi.documents(base.id)
   } catch (cause) {
     fail(cause)
+  }
+}
+
+async function toggleDocument(document: KnowledgeDocument) {
+  if (!selected.value) return
+  if (openedId.value === document.id) {
+    openedId.value = null
+    openedContent.value = ''
+    return
+  }
+  openedId.value = document.id
+  openedContent.value = ''
+  detailLoading.value = true
+  error.value = ''
+  try {
+    const detail = await knowledgeApi.document(selected.value.id, document.id)
+    openedContent.value = detail.content
+  } catch (cause) {
+    fail(cause)
+    openedId.value = null
+  } finally {
+    detailLoading.value = false
   }
 }
 
@@ -77,6 +104,8 @@ async function removeBase(base: KnowledgeBase) {
     if (selected.value?.id === base.id) {
       selected.value = null
       documents.value = []
+      openedId.value = null
+      openedContent.value = ''
     }
     await loadBases()
   } catch (cause) {
@@ -116,6 +145,10 @@ async function removeDocument(document: KnowledgeDocument) {
   error.value = ''
   try {
     await knowledgeApi.removeDocument(selected.value.id, document.id)
+    if (openedId.value === document.id) {
+      openedId.value = null
+      openedContent.value = ''
+    }
     documents.value = await knowledgeApi.documents(selected.value.id)
   } catch (cause) {
     fail(cause)
@@ -187,14 +220,20 @@ onMounted(loadBases)
             <div v-if="documents.length === 0" class="hint">还没有文档</div>
             <ul v-else class="documents">
               <li v-for="document in documents" :key="document.id">
-                <FileText :size="14" />
-                <div class="document-meta">
-                  <strong>{{ document.name }}</strong>
-                  <small>{{ document.chunkCount }} 个文本块</small>
+                <div class="document-line" data-testid="document-toggle" @click="toggleDocument(document)">
+                  <FileText :size="14" />
+                  <div class="document-meta">
+                    <strong>{{ document.name }}</strong>
+                    <small>{{ document.chunkCount }} 个文本块 · 点击查看正文</small>
+                  </div>
+                  <button class="icon-button danger" aria-label="删除文档" @click.stop="removeDocument(document)">
+                    <Trash2 :size="13" />
+                  </button>
                 </div>
-                <button class="icon-button danger" aria-label="删除文档" @click="removeDocument(document)">
-                  <Trash2 :size="13" />
-                </button>
+                <div v-if="openedId === document.id" class="document-content" data-testid="document-detail">
+                  <span v-if="detailLoading" class="hint"><LoaderCircle class="spin" :size="13" />加载正文…</span>
+                  <pre v-else>{{ openedContent }}</pre>
+                </div>
               </li>
             </ul>
           </template>
@@ -271,11 +310,24 @@ input:focus, textarea:focus { border-color: #6366f1; box-shadow: 0 0 0 3px rgba(
 .document-pane h3 { margin: 0; font-size: 13px; color: #334155; }
 .documents li {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  flex-direction: column;
+  gap: 8px;
   padding: 8px 10px;
   border: 1px solid #eef2f7;
   border-radius: 8px;
+}
+.document-line { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+.document-content pre {
+  margin: 0;
+  padding: 8px;
+  max-height: 220px;
+  overflow: auto;
+  background: #f8fafc;
+  border-radius: 6px;
+  font-size: 11.5px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 .hint { color: #64748b; font-size: 12.5px; display: flex; align-items: center; gap: 6px; padding: 10px 2px; }
 .primary-button {

@@ -13,6 +13,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.time.Instant;
 import java.util.Map;
@@ -48,6 +49,11 @@ public class ApiExceptionHandler {
     @ExceptionHandler({IllegalArgumentException.class, HttpMessageNotReadableException.class})
     public ResponseEntity<ApiError> badRequest(Exception error, HttpServletRequest request) {
         return response(HttpStatus.BAD_REQUEST, "请求格式或参数无效：" + error.getMessage(), request, Map.of());
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ApiError> noResource(NoResourceFoundException error, HttpServletRequest request) {
+        return response(HttpStatus.NOT_FOUND, "接口不存在：" + request.getRequestURI(), request, Map.of());
     }
 
     @ExceptionHandler(Exception.class)

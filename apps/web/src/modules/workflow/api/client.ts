@@ -3,6 +3,8 @@ import type {
   GraphDocument,
   KnowledgeBase,
   KnowledgeDocument,
+  KnowledgeDocumentDetail,
+  KnowledgeHit,
   RunEvent,
   ValidationIssue,
   WorkflowApp,
@@ -138,6 +140,9 @@ export const knowledgeApi = {
     request<void>(`/knowledge-bases/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   documents: (id: string) =>
     request<KnowledgeDocument[]>(`/knowledge-bases/${encodeURIComponent(id)}/documents`),
+  document: (id: string, documentId: string) =>
+    request<KnowledgeDocumentDetail>(
+      `/knowledge-bases/${encodeURIComponent(id)}/documents/${encodeURIComponent(documentId)}`),
   addDocument: (id: string, name: string, content: string) =>
     request<KnowledgeDocument>(`/knowledge-bases/${encodeURIComponent(id)}/documents`, jsonHeaders({
       method: 'POST',
@@ -146,6 +151,11 @@ export const knowledgeApi = {
   removeDocument: (id: string, documentId: string) =>
     request<void>(`/knowledge-bases/${encodeURIComponent(id)}/documents/${encodeURIComponent(documentId)}`,
       { method: 'DELETE' }),
+  search: (datasetIds: string[], query: string, topK: number, scoreThreshold: number) =>
+    request<KnowledgeHit[]>('/knowledge-bases/search', jsonHeaders({
+      method: 'POST',
+      body: JSON.stringify({ datasetIds, query, topK, scoreThreshold }),
+    })),
 }
 
 interface StreamOptions {

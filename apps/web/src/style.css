@@ -319,6 +319,18 @@ code, pre, .mono { font-family: var(--mono); }
 .inspector-issues > div { display: flex; gap: 6px; padding: 3px 0; color: #9c4c39; font-size: 10px; line-height: 1.4; }
 .inspector-issues svg { flex: 0 0 auto; margin-top: 1px; }
 .inspector-form { padding: 12px 14px 22px; }
+.retrieval-test { padding: 0 14px 22px; }
+.test-hint { margin: 0 0 8px; color: #959a92; font-size: 9px; line-height: 1.5; }
+.test-controls { display: flex; gap: 6px; }
+.test-controls input { flex: 1; min-width: 0; height: 31px; padding: 0 8px; font-size: 11px; }
+.test-controls .secondary-button { flex: 0 0 auto; gap: 4px; padding: 0 10px; font-size: 10px; }
+.test-error { margin: 8px 0 0; color: var(--danger); font-size: 9px; }
+.test-hits { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 7px; }
+.test-hits li { padding: 8px 9px; background: #f7f6f1; border: 1px solid #e4e4dc; border-radius: 4px; }
+.test-hits header { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 5px; }
+.test-hits strong { color: #424e45; font-size: 10px; font-weight: 600; }
+.test-score { color: var(--accent); font: 9px var(--mono); }
+.test-hits p { margin: 0; color: #5c665d; font-size: 10px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
 .section-title { display: flex; align-items: center; gap: 6px; margin-bottom: 13px; color: #4e5950; font-size: 11px; font-weight: 500; }
 .schema-badge { margin-left: auto; color: #a0a59c; font: 8px var(--mono); letter-spacing: .08em; }
 .dynamic-field { min-width: 0; margin-bottom: 13px; scroll-margin: 100px; }

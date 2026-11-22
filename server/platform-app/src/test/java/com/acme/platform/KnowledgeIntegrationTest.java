@@ -109,6 +109,42 @@ class KnowledgeIntegrationTest {
         assertThat(String.valueOf(run.get("outputs"))).contains("苹果是一种常见水果").contains("1");
     }
 
+    @Test
+    void searchEndpointReturnsScoredHitsAndDocumentDetail() throws Exception {
+        String base = mvc.perform(post("/api/v1/knowledge-bases").contentType(MediaType.APPLICATION_JSON)
+                        .content(json.write(Map.of("name", "水果检索", "description", "调试"))))
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        String knowledgeBaseId = String.valueOf(json.map(base).get("id"));
+
+        String document = mvc.perform(post("/api/v1/knowledge-bases/{id}/documents", knowledgeBaseId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.write(Map.of("name", "苹果文档", "content", "苹果富含维生素。"))))
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        String documentId = String.valueOf(json.map(document).get("id"));
+
+        String detail = mvc.perform(get("/api/v1/knowledge-bases/{id}/documents/{documentId}",
+                        knowledgeBaseId, documentId))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        assertThat(detail).contains("苹果文档").contains("苹果富含维生素。");
+
+        String hits = mvc.perform(post("/api/v1/knowledge-bases/search").contentType(MediaType.APPLICATION_JSON)
+                        .content(json.write(Map.of("datasetIds", List.of(knowledgeBaseId),
+                                "query", "苹果", "topK", 5, "scoreThreshold", 0.0))))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        JsonNode nodes = MAPPER.readTree(hits);
+        assertThat(nodes.isArray()).isTrue();
+        assertThat(nodes.size()).isEqualTo(1);
+        assertThat(nodes.get(0).path("documentName").asText()).isEqualTo("苹果文档");
+        assertThat(nodes.get(0).path("content").asText()).contains("苹果");
+        assertThat(nodes.get(0).path("score").asDouble()).isGreaterThan(0.99);
+
+        String filtered = mvc.perform(post("/api/v1/knowledge-bases/search").contentType(MediaType.APPLICATION_JSON)
+                        .content(json.write(Map.of("datasetIds", List.of(knowledgeBaseId),
+                                "query", "香蕉", "topK", 5, "scoreThreshold", 0.5))))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        assertThat(MAPPER.readTree(filtered).size()).isZero();
+    }
+
     private Map<String, Object> awaitTerminalRun(String runId) throws Exception {
         long deadline = System.nanoTime() + Duration.ofSeconds(15).toNanos();
         Map<String, Object> run = Map.of();

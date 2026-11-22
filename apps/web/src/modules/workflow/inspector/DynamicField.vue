@@ -6,6 +6,7 @@ import type { VariableOption } from '../nodes/variables'
 import VariableSelector from './VariableSelector.vue'
 import KeyValueEditor from './KeyValueEditor.vue'
 import CasesEditor from './CasesEditor.vue'
+import KnowledgeSelect from './KnowledgeSelect.vue'
 import { matchesVisibility } from './conditions'
 import { cloneJson } from '../../../shared/utils/graph'
 
@@ -63,6 +64,7 @@ const kind = computed(() => {
   const key = fieldKey.value
   if ((widget.value === 'cases' || key === 'cases') && schemaType.value === 'array') return 'cases'
   if (widget.value === 'key-value' || widget.value === 'keyValue') return 'key-value'
+  if (widget.value === 'knowledge') return 'knowledge'
   if (schemaType.value === 'object' && !props.schema.properties && props.schema.additionalProperties) return 'key-value'
   if (schemaType.value === 'object' && props.schema.properties) return 'object'
   if (schemaType.value === 'array' && props.schema.items?.enum?.length) return 'enum-array'
@@ -217,6 +219,12 @@ function onJson(event: Event) {
       <label class="field-label">{{ label }}<span v-if="required" class="required">*</span></label>
       <p v-if="schema.description" class="field-description">{{ schema.description }}</p>
       <KeyValueEditor :model-value="modelValue" :shape="schemaType === 'object' ? 'object' : 'array'" :declaration="fieldKey === 'outputs'" @update:model-value="update" />
+    </template>
+
+    <template v-else-if="kind === 'knowledge'">
+      <label class="field-label">{{ label }}<span v-if="required" class="required">*</span></label>
+      <p v-if="schema.description" class="field-description">{{ schema.description }}</p>
+      <KnowledgeSelect :model-value="modelValue" @update:model-value="update" />
     </template>
 
     <template v-else-if="kind === 'enum-array'">

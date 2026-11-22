@@ -44,12 +44,26 @@ public class KnowledgeBaseController {
         return knowledgeBases.addDocument(id, request.name(), request.content());
     }
 
+    @GetMapping("/{id}/documents/{documentId}")
+    public KnowledgeDocumentDetailView document(@PathVariable String id, @PathVariable String documentId) {
+        return knowledgeBases.document(id, documentId);
+    }
+
     @DeleteMapping("/{id}/documents/{documentId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteDocument(@PathVariable String id, @PathVariable String documentId) {
         knowledgeBases.deleteDocument(id, documentId);
     }
 
+    @PostMapping("/search")
+    public List<KnowledgeSearchHitView> search(@RequestBody SearchKnowledgeRequest request) {
+        int topK = request.topK() == null ? 4 : request.topK();
+        double threshold = request.scoreThreshold() == null ? 0.0 : request.scoreThreshold();
+        return knowledgeBases.search(request.datasetIds(), request.query(), topK, threshold);
+    }
+
     public record CreateKnowledgeBaseRequest(String name, String description) { }
     public record AddDocumentRequest(String name, String content) { }
+    public record SearchKnowledgeRequest(List<String> datasetIds, String query, Integer topK,
+                                         Double scoreThreshold) { }
 }

@@ -14,6 +14,19 @@ export interface KnowledgeDocument {
   createdAt: string
 }
 
+export interface KnowledgeDocumentDetail extends KnowledgeDocument {
+  content: string
+}
+
+export interface KnowledgeHit {
+  knowledgeBaseId: string
+  documentId: string
+  documentName: string
+  content: string
+  chunkIndex: number
+  score: number
+}
+
 export type AppType = 'WORKFLOW' | 'CHATFLOW'
 export type NodeConfig = Record<string, unknown>
 

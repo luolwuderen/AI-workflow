@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
-import { AlertTriangle, Copy, Info, MousePointer2, Settings2, Trash2, X } from 'lucide-vue-next'
-import type { JsonSchema, ValidationIssue } from '../api/types'
+import { AlertTriangle, Copy, FlaskConical, Info, LoaderCircle, MousePointer2, Search, Settings2, Trash2, X } from 'lucide-vue-next'
+import type { JsonSchema, KnowledgeHit, ValidationIssue } from '../api/types'
+import { knowledgeApi } from '../api/client'
 import { buildVariableOptions } from '../nodes/variables'
 import DynamicField from './DynamicField.vue'
 import { useWorkflowStore } from '../store/workflow'
@@ -10,6 +11,49 @@ const store = useWorkflowStore()
 const inspector = ref<HTMLElement>()
 const selected = computed(() => store.selectedNode)
 const definition = computed(() => store.selectedDefinition)
+const isRetrieval = computed(() => selected.value?.type === 'knowledge-retrieval')
+const datasetIds = computed<string[]>(() => {
+  const value = selected.value?.config.datasetIds
+  return Array.isArray(value) ? value.map(String) : []
+})
+const testQuery = ref('')
+const testHits = ref<KnowledgeHit[]>([])
+const testing = ref(false)
+const testError = ref('')
+const testRan = ref(false)
+
+watch(() => [selected.value?.id, selected.value?.type], () => {
+  testQuery.value = String(selected.value?.config.query ?? '')
+  testHits.value = []
+  testError.value = ''
+  testRan.value = false
+})
+
+async function runRetrievalTest() {
+  const node = selected.value
+  if (!node || testing.value) return
+  if (datasetIds.value.length === 0) {
+    testError.value = '请先选择至少一个知识库。'
+    return
+  }
+  const query = testQuery.value.trim()
+  if (!query) {
+    testError.value = '请输入检索内容。'
+    return
+  }
+  testing.value = true
+  testError.value = ''
+  try {
+    testHits.value = await knowledgeApi.search(datasetIds.value, query,
+      Number(node.config.topK ?? 4), Number(node.config.scoreThreshold ?? 0))
+    testRan.value = true
+  } catch (cause) {
+    testError.value = cause instanceof Error ? cause.message : String(cause)
+  } finally {
+    testing.value = false
+  }
+}
+
 const variables = computed(() => store.app ? buildVariableOptions(store.app.graph, store.catalog, selected.value?.id) : [])
 const schema = computed<JsonSchema>(() => definition.value?.configSchema ?? {
   type: 'object',
@@ -122,6 +166,29 @@ watch(() => store.focusRequest, async (request) => {
             :root-config="selected.config"
             @change="updateConfig"
           />
+        </section>
+
+        <section v-if="isRetrieval" class="retrieval-test" data-testid="retrieval-test">
+          <div class="section-title"><FlaskConical :size="14" /><span>测试检索</span></div>
+          <p class="test-hint">按当前知识库、条数与相似度门槛实际检索一次，用于确认命中效果。</p>
+          <div class="test-controls">
+            <input v-model="testQuery" data-testid="retrieval-test-query" placeholder="输入检索内容"
+                   @keyup.enter="runRetrievalTest" />
+            <button class="secondary-button" :disabled="testing" @click="runRetrievalTest">
+              <LoaderCircle v-if="testing" class="spin" :size="13" /><Search v-else :size="13" /><span>测试</span>
+            </button>
+          </div>
+          <p v-if="testError" class="test-error">{{ testError }}</p>
+          <ul v-else-if="testHits.length" class="test-hits">
+            <li v-for="hit in testHits" :key="`${hit.documentId}-${hit.chunkIndex}`">
+              <header>
+                <strong>{{ hit.documentName || '未命名文档' }}</strong>
+                <span class="test-score">{{ hit.score.toFixed(3) }}</span>
+              </header>
+              <p>{{ hit.content }}</p>
+            </li>
+          </ul>
+          <p v-else-if="testRan" class="test-hint">没有命中片段，可降低最低相似度后重试。</p>
         </section>
       </div>
       <footer class="inspector-footer">
