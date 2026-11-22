@@ -260,7 +260,8 @@ public class WorkflowExecutor {
             private boolean isActive(GraphEdge edge) {
                 if (!executed.contains(edge.source())) return false;
                 GraphNode source = localNodes.get(edge.source());
-                if (source == null || !"if-else".equals(source.type())) return true;
+                if (source == null) return true;
+                if (!"if-else".equals(source.type()) && !"question-classifier".equals(source.type())) return true;
                 Map<String, Object> output = outputs.get(source.id());
                 Object branch = output == null ? null : output.get("branch");
                 return branch != null && String.valueOf(branch).equals(edge.sourceHandle());

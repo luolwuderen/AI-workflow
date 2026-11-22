@@ -25,6 +25,9 @@ spring:
       chat:
         options:
           model: ${OPENAI_MODEL:default}
+      embedding:
+        model: ${OPENAI_EMBEDDING_MODEL:text-embedding-3-small}
+        dimensions: ${OPENAI_EMBEDDING_DIMENSIONS:1536}
 workflow:
   sse:
     heartbeat-interval: ${SSE_HEARTBEAT_INTERVAL:15s}

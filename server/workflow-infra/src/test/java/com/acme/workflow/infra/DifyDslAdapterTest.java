@@ -1,7 +1,10 @@
 package com.acme.workflow.infra;
 
 import com.acme.workflow.core.catalog.NodeCatalog;
+import com.acme.workflow.core.model.AppType;
 import com.acme.workflow.core.model.GraphDocument;
+import com.acme.workflow.core.model.GraphNode;
+import com.acme.workflow.core.model.Position;
 import com.acme.workflow.core.validation.GraphValidator;
 import com.acme.workflow.infra.dify.DifyDslAdapter;
 import com.acme.workflow.infra.dify.DslException;
@@ -13,6 +16,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -106,6 +110,18 @@ class DifyDslAdapterTest {
         GraphDocument roundTripped = adapter.importYaml(adapter.exportYaml(imported, "Agent"));
         assertThat(roundTripped).isEqualTo(imported);
         assertThat(validator.validate(roundTripped).issues()).isEmpty();
+    }
+
+    @Test
+    void agentCodeToolRoundTripsAsBuiltinExtension() {
+        String dsl = AGENT_DSL.replace("tool_name: calculator", "tool_name: code")
+                .replace("tool_label: Calculator", "tool_label: Code");
+        GraphDocument imported = adapter.importYaml(dsl);
+
+        assertThat(imported.nodes().get(1).config().get("tools")).isEqualTo(List.of("code"));
+        assertThat(validator.validate(imported).issues()).isEmpty();
+        GraphDocument roundTripped = adapter.importYaml(adapter.exportYaml(imported, "Agent"));
+        assertThat(roundTripped).isEqualTo(imported);
     }
 
     @Test
@@ -286,6 +302,136 @@ class DifyDslAdapterTest {
                     type: custom
                     source: agent
                     sourceHandle: source
+                    target: end
+                    targetHandle: target
+                viewport: {x: 0, y: 0, zoom: 1}
+            """;
+
+    @Test
+    void classifierSupportedSubsetRoundTripsWithoutSemanticLoss() {
+        GraphDocument imported = adapter.importYaml(CLASSIFIER_DSL);
+
+        assertThat(validator.validate(imported).issues()).isEmpty();
+        assertThat(imported.nodes().get(1).type()).isEqualTo("question-classifier");
+        assertThat(imported.nodes().get(1).config().get("query")).isEqualTo("{{start.text}}");
+        assertThat(imported.nodes().get(1).config().get("instruction")).isEqualTo("只输出类别 id");
+        GraphDocument roundTripped = adapter.importYaml(adapter.exportYaml(imported, "Classifier"));
+        assertThat(roundTripped).isEqualTo(imported);
+        assertThat(validator.validate(roundTripped).issues()).isEmpty();
+    }
+
+    @Test
+    void rejectsClassifierSemanticsThatCannotBePreserved() {
+        String memory = CLASSIFIER_DSL.replace("assistant: ''", "assistant: '你是助手'");
+        assertThatThrownBy(() -> adapter.importYaml(memory))
+                .isInstanceOf(DslException.class)
+                .hasMessageContaining("$.workflow.graph.nodes[1].data.memory");
+
+        String unknownClassField = CLASSIFIER_DSL.replace("              name: 数学",
+                "              name: 数学\n              description: 数学问题");
+        assertThatThrownBy(() -> adapter.importYaml(unknownClassField))
+                .isInstanceOf(DslException.class)
+                .hasMessageContaining("$.workflow.graph.nodes[1].data.classes[0]")
+                .hasMessageContaining("description");
+
+        String vision = CLASSIFIER_DSL.replace("          instruction:",
+                "          vision:\n            enabled: true\n          instruction:");
+        assertThatThrownBy(() -> adapter.importYaml(vision))
+                .isInstanceOf(DslException.class)
+                .hasMessageContaining("$.workflow.graph.nodes[1].data.vision.enabled");
+    }
+
+    @Test
+    void rejectsClassifierExportWhenQueryIsNotSingleSelector() {
+        GraphNode classifier = new GraphNode("classifier", "question-classifier", "Classifier",
+                new Position(0, 0), Map.of("model", "gpt-4o-mini", "query", "两个变量 {{start.a}} {{start.b}}",
+                        "classes", List.of(Map.of("id", "1", "name", "A"))));
+        GraphDocument graph = new GraphDocument(1, AppType.WORKFLOW, List.of(classifier), List.of(),
+                Map.of("x", 0, "y", 0, "zoom", 1));
+
+        assertThatThrownBy(() -> adapter.exportYaml(graph, "Classifier"))
+                .isInstanceOf(DslException.class)
+                .hasMessageContaining("$.nodes[id=classifier].config.query");
+    }
+
+    private static final String CLASSIFIER_DSL = """
+            app:
+              name: Classifier
+              description: ''
+              icon: 🤖
+              icon_background: '#FFEAD5'
+              mode: workflow
+              use_icon_as_answer_icon: false
+            kind: app
+            version: 0.4.0
+            workflow:
+              conversation_variables: []
+              environment_variables: []
+              features: {}
+              graph:
+                nodes:
+                  - id: start
+                    type: custom
+                    position: {x: 80, y: 160}
+                    data:
+                      desc: ''
+                      title: User Input
+                      type: start
+                      selected: false
+                      variables:
+                        - variable: text
+                          label: Text
+                          type: text-input
+                          required: true
+                  - id: classifier
+                    type: custom
+                    position: {x: 360, y: 160}
+                    data:
+                      desc: ''
+                      title: Classifier
+                      type: question-classifier
+                      selected: false
+                      query_variable_selector: [start, text]
+                      model:
+                        provider: langgenius/openai/openai
+                        name: gpt-4o-mini
+                        mode: chat
+                        completion_params:
+                          temperature: 0.2
+                          top_p: 1.0
+                      classes:
+                        - id: '1'
+                          name: 数学
+                        - id: '2'
+                          name: 其他
+                      instruction: '只输出类别 id'
+                      memory:
+                        role_prefix:
+                          assistant: ''
+                          user: ''
+                        query_prompt_template: ''
+                  - id: end
+                    type: custom
+                    position: {x: 640, y: 160}
+                    data:
+                      desc: ''
+                      title: Output
+                      type: end
+                      selected: false
+                      outputs:
+                        - variable: branch
+                          value_selector: [classifier, branch]
+                edges:
+                  - id: edge-start-classifier
+                    type: custom
+                    source: start
+                    sourceHandle: source
+                    target: classifier
+                    targetHandle: target
+                  - id: edge-classifier-end
+                    type: custom
+                    source: classifier
+                    sourceHandle: '1'
                     target: end
                     targetHandle: target
                 viewport: {x: 0, y: 0, zoom: 1}

@@ -321,6 +321,101 @@ test('Agent 调用 calculator 工具并返回终答，事件含 AGENT_TOOL_CALL'
   await expect(page.getByTestId('run-events')).toContainText('AGENT_TOOL_CALL');
 });
 
+test('Agent 调用 code 工具在沙箱执行并返回终答', async ({ page, request }) => {
+  const name = `E2E Agent ${Date.now()}`;
+  const graph = agentGraph();
+  const agent = graph.nodes.find((node) => node.id === 'agent');
+  if (agent) agent.config = { ...agent.config, tools: ['code'] };
+  await createApp(request, name, 'WORKFLOW', graph);
+  await openApp(page, name);
+
+  await execute(page, '6*7');
+  await expect(page.getByTestId('run-result')).toContainText('42');
+  await expect(page.locator('[data-node-id="agent"]')).toHaveClass(/status-succeeded/);
+  await expect(page.getByTestId('run-events')).toContainText('AGENT_TOOL_CALL');
+});
+
+function classifierGraph(): Graph {
+  return {
+    version: 1,
+    appType: 'WORKFLOW',
+    viewport: { x: 0, y: 0, zoom: 0.85 },
+    nodes: [
+      { id: 'user-input', type: 'user-input', title: '输入', position: { x: 40, y: 220 }, config: { fields: [{ variable: 'text', label: '文本', type: 'text', required: true, default: '苹果' }] } },
+      { id: 'classifier', type: 'question-classifier', title: '问题分类', position: { x: 340, y: 220 }, config: {
+        model: 'default',
+        query: '{{user-input.text}}',
+        classes: [{ id: '1', name: '水果' }, { id: '2', name: '其他' }],
+        instruction: '',
+        temperature: 0.2,
+        topP: 1,
+        maxTokens: 1024,
+      } },
+      { id: 'fruit-output', type: 'output', title: '水果输出', position: { x: 660, y: 90 }, config: { mappings: [{ name: 'fruit', selector: 'classifier.class_name' }] } },
+      { id: 'other-output', type: 'output', title: '其他输出', position: { x: 660, y: 360 }, config: { mappings: [{ name: 'other', selector: 'classifier.class_name' }] } },
+    ],
+    edges: [
+      { id: 'c1', source: 'user-input', target: 'classifier' },
+      { id: 'c2', source: 'classifier', target: 'fruit-output', sourceHandle: '1' },
+      { id: 'c3', source: 'classifier', target: 'other-output', sourceHandle: '2' },
+    ],
+  };
+}
+
+test('问题分类器按模型返回的类别 id 选择分支', async ({ page, request }) => {
+  const name = `E2E Classifier ${Date.now()}`;
+  await createApp(request, name, 'WORKFLOW', classifierGraph());
+  await openApp(page, name);
+
+  await execute(page, '苹果');
+  await expect(page.getByTestId('run-result')).toContainText('水果');
+  await expect(page.locator('[data-node-id="classifier"]')).toHaveClass(/status-succeeded/);
+  await expect(page.locator('[data-node-id="fruit-output"]')).toHaveClass(/status-succeeded/);
+  await expect(page.locator('[data-node-id="other-output"]')).toHaveClass(/status-skipped/);
+});
+
+test('知识检索命中文档并把上下文传给下游', async ({ page, request }) => {
+  const knowledgeName = `E2E Knowledge ${Date.now()}`;
+  const createdBase = await request.post(`${API}/knowledge-bases`, { data: { name: knowledgeName, description: 'e2e' } });
+  expect(createdBase.ok()).toBeTruthy();
+  const knowledgeBaseId = (await createdBase.json()).id;
+  const createdDocument = await request.post(`${API}/knowledge-bases/${knowledgeBaseId}/documents`, {
+    data: { name: '水果简介', content: '苹果是一种常见水果。' },
+  });
+  expect(createdDocument.ok()).toBeTruthy();
+
+  const graph: Graph = {
+    version: 1,
+    appType: 'WORKFLOW',
+    viewport: { x: 0, y: 0, zoom: 0.85 },
+    nodes: [
+      { id: 'user-input', type: 'user-input', title: '输入', position: { x: 40, y: 220 }, config: { fields: [{ variable: 'text', label: '文本', type: 'text', required: true, default: '苹果' }] } },
+      { id: 'retrieval', type: 'knowledge-retrieval', title: '知识检索', position: { x: 340, y: 220 }, config: {
+        datasetIds: [knowledgeBaseId],
+        query: '{{user-input.text}}',
+        topK: 2,
+        scoreThreshold: 0.5,
+      } },
+      { id: 'output', type: 'output', title: '输出', position: { x: 660, y: 220 }, config: { mappings: [
+        { name: 'context', selector: 'retrieval.context' },
+        { name: 'count', selector: 'retrieval.count' },
+      ] } },
+    ],
+    edges: [
+      { id: 'k1', source: 'user-input', target: 'retrieval' },
+      { id: 'k2', source: 'retrieval', target: 'output' },
+    ],
+  };
+
+  const name = `E2E Retrieval ${Date.now()}`;
+  await createApp(request, name, 'WORKFLOW', graph);
+  await openApp(page, name);
+
+  await execute(page, '苹果');
+  await expect(page.getByTestId('run-result')).toContainText('苹果是一种常见水果');
+  await expect(page.locator('[data-node-id="retrieval"]')).toHaveClass(/status-succeeded/);
+});
+
 test('桌面与窄屏布局稳定，撤销重做快捷键可用', async ({ page, request }) => {
   const name = `E2E Layout ${Date.now()}`;
   const longTitle = '用户输入节点 · 这是一个用于验证长文本省略与布局稳定性的超长节点名称 · User Input';

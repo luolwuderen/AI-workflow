@@ -30,9 +30,11 @@ public final class NodeCatalog {
                 llmSchema(), obj("model", "", "messages", List.of(obj("role", "user", "content", "")), "temperature", 0.7,
                         "topP", 1.0, "maxTokens", 2048, "stream", true, "responseFormat", "text"),
                 outputs(obj("text", obj("type", "string")), obj("usage", obj("type", "object")))));
-        register(values, unsupported("knowledge-retrieval", "Knowledge Retrieval", "从知识库检索上下文。", "AI", BOTH,
-                schema(obj("datasetIds", obj("type", "array", "items", obj("type", "string")), "query", obj("type", "string"),
-                        "topK", obj("type", "integer", "minimum", 1)), List.of("datasetIds", "query"))));
+        register(values, executable("knowledge-retrieval", "Knowledge Retrieval", "从平台知识库做向量检索，返回匹配片段。", "AI", BOTH,
+                knowledgeRetrievalSchema(), obj("datasetIds", List.of(), "query", "{{start.text}}",
+                        "topK", 4, "scoreThreshold", 0.0),
+                outputs(obj("result", obj("type", "array")), obj("context", obj("type", "string")),
+                        obj("count", obj("type", "number")))));
         register(values, executable("answer", "Answer", "替换变量并流式返回聊天答案。", "输出", CHATFLOW,
                 schema(obj("answer", obj("type", "string", "title", "答案模板")), List.of("answer")),
                 obj("answer", ""), outputs(obj("answer", obj("type", "string")))));
@@ -44,10 +46,25 @@ public final class NodeCatalog {
                         "temperature", 0.7, "topP", 1.0, "maxTokens", 2048),
                 outputs(obj("text", obj("type", "string")), obj("iterations", obj("type", "number")),
                         obj("usage", obj("type", "object")))));
-        register(values, unsupported("question-classifier", "Question Classifier", "使用模型对问题分类。", "AI", BOTH,
-                schema(obj("model", obj("type", "string"), "query", obj("type", "string"), "classes",
-                        obj("type", "array", "items", obj("type", "object", "properties", obj("id", obj("type", "string"), "name", obj("type", "string"))))),
-                        List.of("model", "query", "classes"))));
+        register(values, executable("question-classifier", "Question Classifier", "使用模型将输入归入类别，并按类别分支。", "AI", BOTH,
+                schema(obj(
+                                "model", obj("type", "string", "minLength", 1, "title", "模型"),
+                                "query", obj("type", "string", "minLength", 1, "title", "输入（支持 {{节点.变量}}）"),
+                                "classes", obj("type", "array", "minItems", 1, "title", "类别", "items",
+                                        obj("type", "object", "properties", obj(
+                                                        "id", obj("type", "string", "minLength", 1, "title", "类别 ID"),
+                                                        "name", obj("type", "string", "minLength", 1, "title", "类别名称")),
+                                                "required", List.of("id", "name"))),
+                                "instruction", obj("type", "string", "title", "额外指令"),
+                                "temperature", obj("type", "number", "minimum", 0, "maximum", 2, "default", 0.2),
+                                "topP", obj("type", "number", "minimum", 0, "maximum", 1, "default", 1.0),
+                                "maxTokens", obj("type", "integer", "minimum", 1, "default", 1024)),
+                        List.of("model", "query", "classes")),
+                obj("model", "", "query", "{{start.text}}",
+                        "classes", List.of(obj("id", "1", "name", "类别 1")),
+                        "instruction", "", "temperature", 0.2, "topP", 1.0, "maxTokens", 1024),
+                outputs(obj("branch", obj("type", "string")), obj("class_name", obj("type", "string")),
+                        obj("usage", obj("type", "object")))));
         register(values, executable("if-else", "IF / ELIF / ELSE", "按条件选择一个确定分支。", "控制", BOTH,
                 ifSchema(), obj("cases", List.of(obj("id", "case-1", "logicalOperator", "and", "conditions", List.of()))),
                 outputs(obj("branch", obj("type", "string")))));
@@ -177,18 +194,29 @@ public final class NodeCatalog {
     }
 
     private static Map<String, Object> agentSchema() {
-        // tools 的 enum 与首版内置工具一致；新增内置工具时需同步扩展此列表。
+        // tools 的 enum 与内置工具一致；新增内置工具时需同步扩展此列表。
         return schema(obj(
                         "model", obj("type", "string", "minLength", 1, "title", "模型"),
                         "instruction", obj("type", "string", "minLength", 1, "title", "提示词（支持 {{节点.变量}}）"),
                         "strategy", obj("type", "string", "enum", List.of("function_call"), "default", "function_call", "title", "策略"),
-                        "tools", obj("type", "array", "items", obj("type", "string", "enum", List.of("calculator")),
+                        "tools", obj("type", "array", "items", obj("type", "string", "enum", List.of("calculator", "code")),
                                 "default", List.of("calculator"), "title", "启用工具"),
                         "maxIterations", obj("type", "integer", "minimum", 1, "maximum", 20, "default", 5, "title", "最大循环次数"),
                         "temperature", obj("type", "number", "minimum", 0, "maximum", 2, "default", 0.7),
                         "topP", obj("type", "number", "minimum", 0, "maximum", 1, "default", 1.0),
                         "maxTokens", obj("type", "integer", "minimum", 1, "default", 2048)),
                 List.of("model", "instruction"));
+    }
+
+    private static Map<String, Object> knowledgeRetrievalSchema() {
+        return schema(obj(
+                        "datasetIds", obj("type", "array", "minItems", 1, "title", "知识库",
+                                "items", obj("type", "string", "minLength", 1)),
+                        "query", obj("type", "string", "minLength", 1, "title", "检索输入（支持 {{节点.变量}}）"),
+                        "topK", obj("type", "integer", "minimum", 1, "maximum", 20, "default", 4, "title", "最多返回条数"),
+                        "scoreThreshold", obj("type", "number", "minimum", 0, "maximum", 1, "default", 0.0,
+                                "title", "最低相似度")),
+                List.of("datasetIds", "query"));
     }
 
     private static Map<String, Object> ifSchema() {

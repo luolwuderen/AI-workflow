@@ -39,7 +39,7 @@ class GraphValidatorTest {
                     assertThat(issue.path()).contains("$.nodes[id=output].config.mappings[0].selector");
                 });
 
-        GraphNode unsupportedNode = new GraphNode("qc", "question-classifier", "QC", output.position(), Map.of());
+        GraphNode unsupportedNode = new GraphNode("tool", "tool", "Tool", output.position(), Map.of());
         GraphDocument unsupported = new GraphDocument(1, AppType.WORKFLOW,
                 List.of(example.nodes().getFirst(), unsupportedNode), example.edges(), example.viewport());
         assertThat(validator.validate(unsupported).issues())

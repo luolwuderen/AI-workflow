@@ -1,3 +1,19 @@
+export interface KnowledgeBase {
+  id: string
+  name: string
+  description: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface KnowledgeDocument {
+  id: string
+  knowledgeBaseId: string
+  name: string
+  chunkCount: number
+  createdAt: string
+}
+
 export type AppType = 'WORKFLOW' | 'CHATFLOW'
 export type NodeConfig = Record<string, unknown>
 

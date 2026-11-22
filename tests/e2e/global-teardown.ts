@@ -1,7 +1,8 @@
 import { request } from '@playwright/test'
 
 const API = 'http://127.0.0.1:8080/api/v1'
-const TEST_APP = /^(Acceptance|Box Hint|Connect Rules|Context Menu|Drag Add|Edge Delete|Edge Drag|Gap Check|Resize Fit|Insert Edge|Insert Branch|E2E Workflow|E2E Chatflow|E2E Editor|E2E Branches|E2E Parallel|E2E Human Input|E2E Agent|E2E Layout) \d+$/
+const TEST_APP = /^(Acceptance|Box Hint|Connect Rules|Context Menu|Drag Add|Edge Delete|Edge Drag|Gap Check|Resize Fit|Insert Edge|Insert Branch|E2E Workflow|E2E Chatflow|E2E Editor|E2E Branches|E2E Parallel|E2E Human Input|E2E Agent|E2E Classifier|E2E Retrieval|E2E Layout) \d+$/
+const TEST_KNOWLEDGE_BASE = /^E2E Knowledge \d+$/
 
 export default async function globalTeardown() {
   const api = await request.newContext()
@@ -23,6 +24,17 @@ export default async function globalTeardown() {
       }
     }
     console.log(`[e2e] 清理测试应用 ${removed} 个${failed ? `，失败 ${failed} 个` : ''}`)
+
+    const basesResponse = await api.get(`${API}/knowledge-bases`)
+    if (basesResponse.ok()) {
+      const bases: Array<{ id: string; name: string }> = await basesResponse.json()
+      for (const base of bases.filter((item) => TEST_KNOWLEDGE_BASE.test(item.name))) {
+        const deleted = await api.delete(`${API}/knowledge-bases/${base.id}`)
+        if (!deleted.ok() && deleted.status() !== 404) {
+          console.warn(`[e2e] 知识库清理失败：${base.name} (${deleted.status()})`)
+        }
+      }
+    }
   } catch (error) {
     console.warn(`[e2e] 清理未完成：${error instanceof Error ? error.message : String(error)}`)
   } finally {

@@ -1,6 +1,8 @@
 import type {
   AppType,
   GraphDocument,
+  KnowledgeBase,
+  KnowledgeDocument,
   RunEvent,
   ValidationIssue,
   WorkflowApp,
@@ -123,6 +125,27 @@ export const workflowApi = {
     }
     return response.text()
   },
+}
+
+export const knowledgeApi = {
+  list: () => request<KnowledgeBase[]>('/knowledge-bases'),
+  create: (name: string, description: string) =>
+    request<KnowledgeBase>('/knowledge-bases', jsonHeaders({
+      method: 'POST',
+      body: JSON.stringify({ name, description }),
+    })),
+  remove: (id: string) =>
+    request<void>(`/knowledge-bases/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  documents: (id: string) =>
+    request<KnowledgeDocument[]>(`/knowledge-bases/${encodeURIComponent(id)}/documents`),
+  addDocument: (id: string, name: string, content: string) =>
+    request<KnowledgeDocument>(`/knowledge-bases/${encodeURIComponent(id)}/documents`, jsonHeaders({
+      method: 'POST',
+      body: JSON.stringify({ name, content }),
+    })),
+  removeDocument: (id: string, documentId: string) =>
+    request<void>(`/knowledge-bases/${encodeURIComponent(id)}/documents/${encodeURIComponent(documentId)}`,
+      { method: 'DELETE' }),
 }
 
 interface StreamOptions {

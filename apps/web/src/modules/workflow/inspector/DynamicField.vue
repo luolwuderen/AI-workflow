@@ -65,6 +65,7 @@ const kind = computed(() => {
   if (widget.value === 'key-value' || widget.value === 'keyValue') return 'key-value'
   if (schemaType.value === 'object' && !props.schema.properties && props.schema.additionalProperties) return 'key-value'
   if (schemaType.value === 'object' && props.schema.properties) return 'object'
+  if (schemaType.value === 'array' && props.schema.items?.enum?.length) return 'enum-array'
   if (schemaType.value === 'array' && props.schema.items?.properties) return 'array-objects'
   if (widget.value === 'variable' || widget.value === 'variable-selector' || props.schema['x-variable-selector']
     || key === 'selector' || key === 'inputSelector' || uiOptions.value.variable === true) return 'variable'
@@ -124,6 +125,19 @@ function defaultFor(schema: JsonSchema | undefined): unknown {
 }
 function addArrayItem() {
   update([...arrayValue.value, defaultFor(props.schema.items)])
+}
+const arrayEnumValues = computed<string[]>(() => {
+  const options = props.schema.items?.enum
+  return Array.isArray(options) ? options.map(String) : []
+})
+function selectedArrayEnum(option: string) {
+  return arrayValue.value.map(String).includes(option)
+}
+function toggleArrayEnum(option: string, checked: boolean) {
+  const selected = new Set(arrayValue.value.map(String))
+  if (checked) selected.add(option)
+  else selected.delete(option)
+  update(arrayEnumValues.value.filter((item) => selected.has(item)))
 }
 function removeArrayItem(index: number) {
   update(arrayValue.value.filter((_, itemIndex) => itemIndex !== index))
@@ -203,6 +217,17 @@ function onJson(event: Event) {
       <label class="field-label">{{ label }}<span v-if="required" class="required">*</span></label>
       <p v-if="schema.description" class="field-description">{{ schema.description }}</p>
       <KeyValueEditor :model-value="modelValue" :shape="schemaType === 'object' ? 'object' : 'array'" :declaration="fieldKey === 'outputs'" @update:model-value="update" />
+    </template>
+
+    <template v-else-if="kind === 'enum-array'">
+      <label class="field-label">{{ label }}<span v-if="required" class="required">*</span></label>
+      <p v-if="schema.description" class="field-description">{{ schema.description }}</p>
+      <div class="enum-options">
+        <label v-for="option in arrayEnumValues" :key="option" class="enum-option">
+          <input type="checkbox" :checked="selectedArrayEnum(option)" @change="toggleArrayEnum(option, ($event.target as HTMLInputElement).checked)" />
+          <span>{{ option }}</span>
+        </label>
+      </div>
     </template>
 
     <template v-else-if="kind === 'array-objects'">

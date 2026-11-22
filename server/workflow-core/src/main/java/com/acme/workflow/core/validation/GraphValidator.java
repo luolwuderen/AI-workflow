@@ -90,7 +90,8 @@ public class GraphValidator {
             incoming.computeIfAbsent(edge.target(), ignored -> new ArrayList<>()).add(edge);
             if (!java.util.Objects.equals(source.parentId(), nodes.get(edge.target()).parentId()))
                 issue(issues, path, "CROSS_SCOPE_EDGE", "连线两端必须在同一作用域。");
-            if ("if-else".equals(source.type())) validateBranch(edge, source, path, issues);
+            if ("if-else".equals(source.type()) || "question-classifier".equals(source.type()))
+                validateBranch(edge, source, path, issues);
         }
         for (GraphNode node : nodes.values()) {
             List<GraphEdge> in = incoming.getOrDefault(node.id(), List.of());
@@ -124,6 +125,16 @@ public class GraphValidator {
                     issue(issues, path + ".strategy", "STRATEGY", "Agent 仅支持 strategy=function_call。");
                 if (config.get("maxIterations") instanceof Number max && (max.intValue() < 1 || max.intValue() > 20))
                     issue(issues, path + ".maxIterations", "RANGE", "maxIterations 必须在 1-20 之间。");
+                Object tools = config.get("tools");
+                if (tools != null) {
+                    List<?> configured = list(tools);
+                    if (configured == null) issue(issues, path + ".tools", "TOOLS", "tools 必须为数组。");
+                    else for (int i = 0; i < configured.size(); i++) {
+                        String tool = string(configured.get(i));
+                        if (tool == null || !Set.of("calculator", "code").contains(tool))
+                            issue(issues, path + ".tools[" + i + "]", "TOOL", "未知工具：" + tool + "。");
+                    }
+                }
             }
             case "if-else" -> {
                 List<?> cases = list(config.get("cases"));
@@ -138,6 +149,43 @@ public class GraphValidator {
                             issue(issues, path + ".cases[" + i + "].conditions", "REQUIRED", "每个 case 至少需要一个条件。");
                     }
                 }
+            }
+            case "question-classifier" -> {
+                if (blank(string(config.get("model")))) issue(issues, path + ".model", "REQUIRED", "model 必填。");
+                if (blank(string(config.get("query")))) issue(issues, path + ".query", "REQUIRED", "query 必填。");
+                List<?> classes = list(config.get("classes"));
+                if (classes == null || classes.isEmpty()) issue(issues, path + ".classes", "REQUIRED", "至少配置一个类别。");
+                else {
+                    Set<String> ids = new HashSet<>();
+                    for (int i = 0; i < classes.size(); i++) {
+                        if (!(classes.get(i) instanceof Map<?, ?> one)) {
+                            issue(issues, path + ".classes[" + i + "]", "CLASS", "类别必须为对象。");
+                            continue;
+                        }
+                        String id = string(one.get("id"));
+                        if (blank(id) || !ids.add(id)) issue(issues, path + ".classes[" + i + "].id", "CLASS_ID", "类别 id 必填且不能重复。");
+                        if (blank(string(one.get("name")))) issue(issues, path + ".classes[" + i + "].name", "REQUIRED", "类别名称必填。");
+                    }
+                }
+                if (config.get("temperature") instanceof Number temperature && (temperature.doubleValue() < 0 || temperature.doubleValue() > 2))
+                    issue(issues, path + ".temperature", "RANGE", "temperature 必须在 0-2 之间。");
+                if (config.get("topP") instanceof Number topP && (topP.doubleValue() < 0 || topP.doubleValue() > 1))
+                    issue(issues, path + ".topP", "RANGE", "topP 必须在 0-1 之间。");
+            }
+            case "knowledge-retrieval" -> {
+                List<?> datasetIds = list(config.get("datasetIds"));
+                if (datasetIds == null || datasetIds.isEmpty())
+                    issue(issues, path + ".datasetIds", "REQUIRED", "至少选择一个知识库。");
+                else for (int i = 0; i < datasetIds.size(); i++) {
+                    if (blank(string(datasetIds.get(i))))
+                        issue(issues, path + ".datasetIds[" + i + "]", "REQUIRED", "知识库 id 不能为空。");
+                }
+                if (blank(string(config.get("query")))) issue(issues, path + ".query", "REQUIRED", "query 必填。");
+                if (config.get("topK") instanceof Number topK && (topK.intValue() < 1 || topK.intValue() > 20))
+                    issue(issues, path + ".topK", "RANGE", "topK 必须在 1-20 之间。");
+                if (config.get("scoreThreshold") instanceof Number threshold
+                        && (threshold.doubleValue() < 0 || threshold.doubleValue() > 1))
+                    issue(issues, path + ".scoreThreshold", "RANGE", "scoreThreshold 必须在 0-1 之间。");
             }
             case "code" -> {
                 if (!Set.of("python3", "javascript").contains(string(config.get("language"))))
@@ -261,15 +309,19 @@ public class GraphValidator {
     }
 
     private void validateBranch(GraphEdge edge, GraphNode source, String path, List<ValidationIssue> issues) {
+        boolean classifier = "question-classifier".equals(source.type());
         String handle = edge.sourceHandle();
         if (blank(handle)) {
-            issue(issues, path + ".sourceHandle", "BRANCH_HANDLE", "IF 出边必须指定 case id 或 else。");
+            issue(issues, path + ".sourceHandle", "BRANCH_HANDLE",
+                    classifier ? "分类器出边必须指定 class id。" : "IF 出边必须指定 case id 或 else。");
             return;
         }
-        if ("else".equals(handle)) return;
-        boolean found = list(source.config().get("cases")) != null && list(source.config().get("cases")).stream()
+        if (!classifier && "else".equals(handle)) return;
+        String field = classifier ? "classes" : "cases";
+        boolean found = list(source.config().get(field)) != null && list(source.config().get(field)).stream()
                 .filter(Map.class::isInstance).map(Map.class::cast).anyMatch(item -> handle.equals(string(item.get("id"))));
-        if (!found) issue(issues, path + ".sourceHandle", "BRANCH_HANDLE", "sourceHandle 未匹配任何 case id。");
+        if (!found) issue(issues, path + ".sourceHandle", "BRANCH_HANDLE",
+                classifier ? "sourceHandle 未匹配任何 class id。" : "sourceHandle 未匹配任何 case id。");
     }
 
     private void validateScopes(Map<String, GraphNode> nodes, Map<String, List<GraphEdge>> incoming,

@@ -29,6 +29,9 @@ public class DifyDslAdapter {
     private static final Set<String> NODE_FIELDS = Set.of("id", "type", "title", "position", "positionAbsolute", "data", "width", "height",
             "sourcePosition", "targetPosition", "selected", "parentId");
     private static final Set<String> INTERNAL_STARTS = Set.of("iteration-start", "loop-start");
+    /** 平台内置 Agent 工具在 Dify DSL 中统一以 builtin provider 表达，需与 NodeCatalog 的 tools enum 保持一致。 */
+    private static final List<String> BUILTIN_TOOLS = List.of("calculator", "code");
+    private static final Map<String, String> BUILTIN_TOOL_LABELS = Map.of("calculator", "Calculator", "code", "Code");
     private static final Set<String> EDGE_FIELDS = Set.of("id", "type", "source", "sourceHandle", "target", "targetHandle", "data", "zIndex");
     private final ObjectMapper yaml = new ObjectMapper(YAMLFactory.builder()
             .disable(YAMLGenerator.Feature.WRITE_DOC_START_MARKER)
@@ -122,7 +125,8 @@ public class DifyDslAdapter {
         String type = switch (difyType) {
             case "start" -> "user-input";
             case "end" -> "output";
-            case "llm", "if-else", "code", "answer", "iteration", "loop", "exit-loop", "human-input", "agent" -> difyType;
+            case "llm", "if-else", "code", "answer", "iteration", "loop", "exit-loop", "human-input", "agent",
+                 "question-classifier" -> difyType;
             case "template-transform" -> "template";
             case "variable-aggregator" -> "variable-aggregator";
             case "list-operator" -> "list-operator";
@@ -143,6 +147,7 @@ public class DifyDslAdapter {
             case "exit-loop" -> importExitLoop(data, path + ".data");
             case "human-input" -> importHumanInput(data, path + ".data");
             case "agent" -> importAgent(data, path + ".data");
+            case "question-classifier" -> importQuestionClassifier(data, path + ".data");
             default -> throw new AssertionError();
         };
         Position position = position(raw.get("position"), path + ".position");
@@ -333,11 +338,60 @@ public class DifyDslAdapter {
             Map<String, Object> tool = object(raw, itemPath);
             allowed(tool, Set.of("provider_id", "provider_type", "tool_name", "tool_label", "type", "enabled"), itemPath);
             String name = requiredString(tool.get("tool_name"), itemPath + ".tool_name");
-            if (!"calculator".equals(name))
-                throw new DslException(itemPath + ".tool_name", "暂不支持工具 " + name + "，仅内置 calculator。");
+            if (!BUILTIN_TOOL_LABELS.containsKey(name))
+                throw new DslException(itemPath + ".tool_name", "暂不支持工具 " + name + "，仅内置 " + BUILTIN_TOOLS + "。");
             tools.add(name);
         }
         config.put("tools", tools);
+        return config;
+    }
+
+    private Map<String, Object> importQuestionClassifier(Map<String, Object> data, String path) {
+        allowed(data, Set.of("desc", "title", "type", "selected", "query_variable_selector", "model", "classes",
+                "instruction", "memory", "vision"), path);
+        if (data.get("vision") != null) {
+            Map<String, Object> vision = object(data.get("vision"), path + ".vision");
+            allowed(vision, Set.of("enabled"), path + ".vision");
+            if (!Boolean.FALSE.equals(vision.get("enabled")))
+                throw new DslException(path + ".vision.enabled", "暂不支持分类器视觉能力。");
+        }
+        if (data.get("memory") != null) {
+            Map<String, Object> memory = object(data.get("memory"), path + ".memory");
+            allowed(memory, Set.of("role_prefix", "query_prompt_template"), path + ".memory");
+            if (!emptyValue(memory)) throw new DslException(path + ".memory", "暂不支持分类器对话记忆配置。");
+        }
+        Map<String, Object> model = object(data.get("model"), path + ".model");
+        allowed(model, Set.of("provider", "name", "mode", "completion_params"), path + ".model");
+        String provider = requiredString(model.get("provider"), path + ".model.provider");
+        if (!Set.of("openai", "langgenius/openai/openai").contains(provider))
+            throw new DslException(path + ".model.provider", "暂不支持模型供应商 " + provider + "。");
+        if (!"chat".equals(requiredString(model.get("mode"), path + ".model.mode")))
+            throw new DslException(path + ".model.mode", "仅支持 chat 模式。");
+        Map<String, Object> config = map("model", requiredString(model.get("name"), path + ".model.name"));
+        if (model.get("completion_params") != null) {
+            Map<String, Object> params = object(model.get("completion_params"), path + ".model.completion_params");
+            allowed(params, Set.of("temperature", "top_p", "max_tokens"), path + ".model.completion_params");
+            if (params.get("temperature") != null) config.put("temperature", params.get("temperature"));
+            if (params.get("top_p") != null) config.put("topP", params.get("top_p"));
+            if (params.get("max_tokens") != null) config.put("maxTokens", params.get("max_tokens"));
+        }
+        List<?> selector = array(data.get("query_variable_selector"), path + ".query_variable_selector");
+        if (selector.size() != 2)
+            throw new DslException(path + ".query_variable_selector", "query_variable_selector 必须为 [nodeId, key]。");
+        config.put("query", "{{" + selector.get(0) + "." + selector.get(1) + "}}");
+        List<?> rawClasses = array(data.get("classes"), path + ".classes");
+        if (rawClasses.isEmpty()) throw new DslException(path + ".classes", "至少配置一个类别。");
+        List<Map<String, Object>> classes = new ArrayList<>();
+        for (int i = 0; i < rawClasses.size(); i++) {
+            String itemPath = path + ".classes[" + i + "]";
+            Map<String, Object> item = object(rawClasses.get(i), itemPath);
+            allowed(item, Set.of("id", "name"), itemPath);
+            classes.add(map("id", requiredScalar(item.get("id"), itemPath + ".id"),
+                    "name", requiredScalar(item.get("name"), itemPath + ".name")));
+        }
+        config.put("classes", classes);
+        if (data.get("instruction") != null)
+            config.put("instruction", fromDifyTemplate(String.valueOf(data.get("instruction"))));
         return config;
     }
 
@@ -485,9 +539,10 @@ public class DifyDslAdapter {
         }
         String source = requiredString(raw.get("source"), path + ".source");
         String handle = raw.get("sourceHandle") == null ? null : String.valueOf(raw.get("sourceHandle"));
-        if ("if-else".equals(types.get(source))) {
+        String sourceType = types.get(source);
+        if ("if-else".equals(sourceType)) {
             if ("false".equals(handle)) handle = "else";
-        } else handle = null;
+        } else if (!"question-classifier".equals(sourceType)) handle = null;
         return new GraphEdge(requiredString(raw.get("id"), path + ".id"), source,
                 requiredString(raw.get("target"), path + ".target"), handle, null);
     }
@@ -520,6 +575,7 @@ public class DifyDslAdapter {
             case "exit-loop" -> exportExitLoop(node, data);
             case "human-input" -> exportHumanInput(node, data);
             case "agent" -> exportAgent(node, data);
+            case "question-classifier" -> exportQuestionClassifier(node, data);
             default -> throw new DslException("$.nodes[id=" + node.id() + "].type", "当前 DSL 不支持导出 " + node.type() + "。");
         }
         Map<String, Object> result = map("id", node.id(), "type", "custom",
@@ -633,14 +689,49 @@ public class DifyDslAdapter {
         List<Map<String, Object>> tools = new ArrayList<>();
         for (Object raw : list(config.getOrDefault("tools", List.of()), "tools")) {
             String name = String.valueOf(raw);
-            if (!"calculator".equals(name))
+            String label = BUILTIN_TOOL_LABELS.get(name);
+            if (label == null)
                 throw new DslException("$.nodes[id=" + node.id() + "].config.tools",
-                        "Dify DSL 导出仅支持内置 calculator 工具，不支持 " + name + "。");
+                        "Dify DSL 导出仅支持内置工具 " + BUILTIN_TOOLS + "，不支持 " + name + "。");
             tools.add(map("provider_id", "builtin", "provider_type", "builtin",
-                    "tool_name", "calculator", "tool_label", "Calculator", "type", "builtin"));
+                    "tool_name", name, "tool_label", label, "type", "builtin"));
         }
         data.put("tools", tools);
         data.put("vision", map("enabled", false));
+    }
+
+    private void exportQuestionClassifier(GraphNode node, Map<String, Object> data) {
+        Map<String, Object> config = node.config();
+        data.put("query_variable_selector", singleSelector(String.valueOf(config.getOrDefault("query", "")),
+                "$.nodes[id=" + node.id() + "].config.query"));
+        Map<String, Object> params = new LinkedHashMap<>();
+        if (config.get("temperature") != null) params.put("temperature", config.get("temperature"));
+        if (config.get("topP") != null) params.put("top_p", config.get("topP"));
+        if (config.get("maxTokens") != null) params.put("max_tokens", config.get("maxTokens"));
+        data.put("model", map("name", config.get("model"), "provider", "langgenius/openai/openai",
+                "mode", "chat", "completion_params", params));
+        List<Map<String, Object>> classes = new ArrayList<>();
+        for (Object raw : list(config.get("classes"), "classes")) {
+            Map<?, ?> one = (Map<?, ?>) raw;
+            classes.add(map("id", one.get("id"), "name", one.get("name")));
+        }
+        data.put("classes", classes);
+        if (config.get("instruction") != null && !String.valueOf(config.get("instruction")).isBlank())
+            data.put("instruction", toDifyTemplate(String.valueOf(config.get("instruction"))));
+    }
+
+    private static List<String> singleSelector(String template, String path) {
+        Matcher matcher = GRAPH_TEMPLATE.matcher(template);
+        if (!matcher.matches()) throw new DslException(path, "必须为单个 {{节点.变量}} 选择器。");
+        return List.of(matcher.group(1), matcher.group(2));
+    }
+
+    private static boolean emptyValue(Object value) {
+        if (value == null) return true;
+        if (value instanceof String text) return text.isBlank();
+        if (value instanceof Map<?, ?> entries) return entries.values().stream().allMatch(DifyDslAdapter::emptyValue);
+        if (value instanceof List<?> items) return items.stream().allMatch(DifyDslAdapter::emptyValue);
+        return false;
     }
 
     private Map<String, Object> exportCase(Map<?, ?> one) {
@@ -702,7 +793,11 @@ public class DifyDslAdapter {
     }
 
     private Map<String, Object> exportEdge(GraphEdge edge, Map<String, String> types, Map<String, String> parents) {
-        String handle = "if-else".equals(types.get(edge.source())) ? ("else".equals(edge.sourceHandle()) ? "false" : edge.sourceHandle()) : "source";
+        String sourceType = types.get(edge.source());
+        String handle;
+        if ("if-else".equals(sourceType)) handle = "else".equals(edge.sourceHandle()) ? "false" : edge.sourceHandle();
+        else if ("question-classifier".equals(sourceType)) handle = edge.sourceHandle();
+        else handle = "source";
         String sourceParent = types.get(parents.get(edge.source()));
         String targetParent = types.get(parents.get(edge.target()));
         return map("id", edge.id(), "type", "custom", "source", edge.source(), "sourceHandle", handle,
@@ -825,6 +920,12 @@ public class DifyDslAdapter {
     private static String requiredString(Object raw, String path) {
         if (raw instanceof String value && !value.isBlank()) return value;
         throw new DslException(path, "必填字符串缺失。");
+    }
+
+    /** 分类器类别 id 在 YAML 中可能被解析为数字，导出时也会省略引号，因此接受数字标量并转成字符串。 */
+    private static String requiredScalar(Object raw, String path) {
+        if (raw instanceof Number number) return String.valueOf(number);
+        return requiredString(raw, path);
     }
 
     private static void copy(Map<String, Object> from, String fromKey, Map<String, Object> to, String toKey) {

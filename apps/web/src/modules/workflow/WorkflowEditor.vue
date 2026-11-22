@@ -7,6 +7,7 @@ import {
   CloudOff,
   Download,
   FilePlus2,
+  Library,
   LoaderCircle,
   RefreshCw,
   Save,
@@ -20,6 +21,7 @@ import NodePalette from './nodes/NodePalette.vue'
 import WorkflowCanvas from './canvas/WorkflowCanvas.vue'
 import NodeInspector from './inspector/NodeInspector.vue'
 import RunPanel from './canvas/RunPanel.vue'
+import KnowledgeBasePanel from '../knowledge/KnowledgeBasePanel.vue'
 import { useWorkflowStore } from './store/workflow'
 import { useRunStore } from './store/run'
 
@@ -28,6 +30,7 @@ const runStore = useRunStore()
 const newAppType = ref<AppType>('WORKFLOW')
 const fileInput = ref<HTMLInputElement>()
 const exporting = ref(false)
+const knowledgeOpen = ref(false)
 const selectedAppId = computed({
   get: () => store.app?.id ?? '',
   set: (id: string) => { void store.loadApp(id) },
@@ -180,6 +183,9 @@ onBeforeUnmount(() => {
         <button class="header-button" data-testid="export-yaml" :disabled="!store.app || exporting" @click="exportYaml">
           <Download :size="14" /><span>{{ exporting ? '导出中' : '导出 YAML' }}</span>
         </button>
+        <button class="header-button" data-testid="open-knowledge" @click="knowledgeOpen = true">
+          <Library :size="14" /><span>知识库</span>
+        </button>
         <span class="header-divider" />
         <div class="new-app-control">
           <select v-model="newAppType" data-testid="app-type-select" aria-label="新应用类型">
@@ -209,6 +215,8 @@ onBeforeUnmount(() => {
       <AlertCircle :size="15" /><span>YAML 导入失败：{{ store.importError }}</span>
       <button class="icon-button" @click="store.importError = ''"><X :size="14" /></button>
     </div>
+
+    <KnowledgeBasePanel v-if="knowledgeOpen" @close="knowledgeOpen = false" />
 
     <main v-if="store.app" class="workbench">
       <NodePalette @add="addNode" />

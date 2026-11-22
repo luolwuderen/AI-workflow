@@ -24,6 +24,6 @@ class NodeCatalogTest {
                 .map(NodeCatalogEntry::type).collect(Collectors.toSet());
         assertThat(executable).containsExactlyInAnyOrder("user-input", "llm", "answer", "output", "if-else", "code",
                 "template", "variable-aggregator", "variable-assigner", "list-operator", "http-request",
-                "iteration", "loop", "exit-loop", "human-input", "agent");
+                "iteration", "loop", "exit-loop", "human-input", "agent", "question-classifier", "knowledge-retrieval");
     }
 }

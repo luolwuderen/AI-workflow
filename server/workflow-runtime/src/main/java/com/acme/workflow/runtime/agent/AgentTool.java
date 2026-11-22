@@ -4,7 +4,7 @@ import java.util.Map;
 
 /**
  * Agent 节点可调用的内置工具 SPI。
- * 首版仅提供 {@code calculator}，后续 code / http / 插件工具通过新增实现接入。
+ * 内置实现包括 {@code calculator} 与 {@code code}，后续 http / 插件工具通过新增实现接入。
  */
 public interface AgentTool {
 
