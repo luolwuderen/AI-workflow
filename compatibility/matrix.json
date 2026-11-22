@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "baseline": "baseline.json",
+  "capabilities": [
+    {"type":"user-input","catalog":true,"configurable":true,"validatable":true,"executable":true,"dslRoundTrip":true},
+    {"type":"schedule-trigger","catalog":true,"configurable":true,"validatable":true,"executable":false,"dslRoundTrip":false},
+    {"type":"plugin-trigger","catalog":true,"configurable":true,"validatable":true,"executable":false,"dslRoundTrip":false},
+    {"type":"webhook-trigger","catalog":true,"configurable":true,"validatable":true,"executable":false,"dslRoundTrip":false},
+    {"type":"llm","catalog":true,"configurable":true,"validatable":true,"executable":true,"dslRoundTrip":true},
+    {"type":"knowledge-retrieval","catalog":true,"configurable":true,"validatable":true,"executable":false,"dslRoundTrip":false},
+    {"type":"answer","catalog":true,"configurable":true,"validatable":true,"executable":true,"dslRoundTrip":true},
+    {"type":"output","catalog":true,"configurable":true,"validatable":true,"executable":true,"dslRoundTrip":true},
+    {"type":"agent","catalog":true,"configurable":true,"validatable":true,"executable":true,"dslRoundTrip":true},
+    {"type":"question-classifier","catalog":true,"configurable":true,"validatable":true,"executable":false,"dslRoundTrip":false},
+    {"type":"if-else","catalog":true,"configurable":true,"validatable":true,"executable":true,"dslRoundTrip":true},
+    {"type":"human-input","catalog":true,"configurable":true,"validatable":true,"executable":false,"dslRoundTrip":false},
+    {"type":"iteration","catalog":true,"configurable":true,"validatable":true,"executable":false,"dslRoundTrip":false},
+    {"type":"loop","catalog":true,"configurable":true,"validatable":true,"executable":false,"dslRoundTrip":false},
+    {"type":"exit-loop","catalog":true,"configurable":true,"validatable":true,"executable":false,"dslRoundTrip":false},
+    {"type":"code","catalog":true,"configurable":true,"validatable":true,"executable":true,"dslRoundTrip":true},
+    {"type":"template","catalog":true,"configurable":true,"validatable":true,"executable":false,"dslRoundTrip":false},
+    {"type":"variable-aggregator","catalog":true,"configurable":true,"validatable":true,"executable":false,"dslRoundTrip":false},
+    {"type":"variable-assigner","catalog":true,"configurable":true,"validatable":true,"executable":false,"dslRoundTrip":false},
+    {"type":"document-extractor","catalog":true,"configurable":true,"validatable":true,"executable":false,"dslRoundTrip":false},
+    {"type":"parameter-extractor","catalog":true,"configurable":true,"validatable":true,"executable":false,"dslRoundTrip":false},
+    {"type":"http-request","catalog":true,"configurable":true,"validatable":true,"executable":false,"dslRoundTrip":false},
+    {"type":"list-operator","catalog":true,"configurable":true,"validatable":true,"executable":false,"dslRoundTrip":false},
+    {"type":"tool","catalog":true,"configurable":true,"validatable":true,"executable":false,"dslRoundTrip":false}
+  ]
+}

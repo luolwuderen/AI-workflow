@@ -1,0 +1,84 @@
+app:
+  name: Data Nodes
+  description: Template transform and variable aggregator round trip.
+  icon: 🤖
+  icon_background: '#FFEAD5'
+  mode: workflow
+  use_icon_as_answer_icon: false
+kind: app
+version: 0.4.0
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features: {}
+  graph:
+    nodes:
+      - id: start
+        type: custom
+        position: {x: 80, y: 160}
+        data:
+          desc: ''
+          title: User Input
+          type: start
+          selected: false
+          variables:
+            - variable: text
+              label: Text
+              type: text-input
+              required: true
+              default: hello
+      - id: template
+        type: custom
+        position: {x: 360, y: 160}
+        data:
+          desc: ''
+          title: Template
+          type: template-transform
+          selected: false
+          template: 'Hello {{#start.text#}}!'
+          variables:
+            - variable: name
+              value_selector: [start, text]
+      - id: aggregator
+        type: custom
+        position: {x: 640, y: 160}
+        data:
+          desc: ''
+          title: Variable Aggregator
+          type: variable-aggregator
+          selected: false
+          output_type: string
+          variables:
+            - [template, output]
+            - [start, text]
+      - id: end
+        type: custom
+        position: {x: 920, y: 160}
+        data:
+          desc: ''
+          title: Output
+          type: end
+          selected: false
+          outputs:
+            - variable: message
+              value_selector: [aggregator, output]
+    edges:
+      - id: edge-start-template
+        type: custom
+        source: start
+        sourceHandle: source
+        target: template
+        targetHandle: target
+      - id: edge-template-aggregator
+        type: custom
+        source: template
+        sourceHandle: source
+        target: aggregator
+        targetHandle: target
+      - id: edge-aggregator-end
+        type: custom
+        source: aggregator
+        sourceHandle: source
+        target: end
+        targetHandle: target
+    viewport: {x: 0, y: 0, zoom: 1}

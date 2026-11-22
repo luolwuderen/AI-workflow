@@ -1,0 +1,99 @@
+app:
+  name: Core Workflow
+  description: Start, LLM, code and output round trip.
+  icon: 🤖
+  icon_background: '#FFEAD5'
+  mode: workflow
+  use_icon_as_answer_icon: false
+kind: app
+version: 0.4.0
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features: {}
+  graph:
+    nodes:
+      - id: start
+        type: custom
+        position: {x: 80, y: 160}
+        data:
+          desc: ''
+          title: User Input
+          type: start
+          selected: false
+          variables:
+            - variable: text
+              label: Text
+              type: text-input
+              required: true
+              default: hello
+      - id: llm
+        type: custom
+        position: {x: 360, y: 160}
+        data:
+          desc: ''
+          title: LLM
+          type: llm
+          selected: false
+          model:
+            name: gpt-4o-mini
+            provider: openai
+            mode: chat
+            completion_params:
+              temperature: 0.2
+              top_p: 1.0
+              max_tokens: 128
+          prompt_template:
+            - role: user
+              text: 'Summarize: {{#start.text#}}'
+      - id: code
+        type: custom
+        position: {x: 640, y: 160}
+        data:
+          desc: ''
+          title: Code
+          type: code
+          selected: false
+          code_language: python3
+          code: |-
+            def main(text):
+                return {"length": len(text), "summary": text.upper()}
+          variables:
+            - variable: text
+              value_selector: [llm, text]
+          outputs:
+            length: {type: number, children: null}
+            summary: {type: string, children: null}
+      - id: end
+        type: custom
+        position: {x: 920, y: 160}
+        data:
+          desc: ''
+          title: Output
+          type: end
+          selected: false
+          outputs:
+            - variable: summary
+              value_selector: [code, summary]
+            - variable: original
+              value_selector: [start, text]
+    edges:
+      - id: edge-start-llm
+        type: custom
+        source: start
+        sourceHandle: source
+        target: llm
+        targetHandle: target
+      - id: edge-llm-code
+        type: custom
+        source: llm
+        sourceHandle: source
+        target: code
+        targetHandle: target
+      - id: edge-code-end
+        type: custom
+        source: code
+        sourceHandle: source
+        target: end
+        targetHandle: target
+    viewport: {x: 0, y: 0, zoom: 1}

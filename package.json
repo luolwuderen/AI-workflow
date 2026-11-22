@@ -1,0 +1,15 @@
+{
+  "name": "weave-platform",
+  "private": true,
+  "packageManager": "pnpm@9.15.4",
+  "scripts": {
+    "dev": "pnpm --filter @weave/web dev",
+    "build": "pnpm --filter @weave/web build",
+    "test": "pnpm --filter @weave/web test",
+    "test:e2e": "playwright test",
+    "typecheck": "pnpm --filter @weave/web typecheck"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.56.1"
+  }
+}

@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Builds
+apps/web/dist/
+server/*/target/
+.playwright/
+test-results/
+playwright-report/
+
+# Local runtime
+*.log
+.data/
+.env
+.env.*
+!.env.example
+
+# Editors and OS
+.DS_Store
+.idea/
+.vscode/

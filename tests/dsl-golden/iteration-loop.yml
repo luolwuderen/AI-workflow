@@ -1,0 +1,139 @@
+app:
+  name: Iteration Loop
+  description: Iteration and loop scopes round trip.
+  icon: 🤖
+  icon_background: '#FEF3C7'
+  mode: workflow
+  use_icon_as_answer_icon: false
+kind: app
+version: 0.4.0
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features: {}
+  graph:
+    nodes:
+      - id: start
+        type: custom
+        position: {x: 80, y: 160}
+        data:
+          desc: ''
+          title: User Input
+          type: start
+          selected: false
+          variables:
+            - variable: items
+              label: Items
+              type: json
+              required: true
+            - variable: text
+              label: Text
+              type: text-input
+              required: true
+      - id: iteration
+        type: custom
+        position: {x: 340, y: 120}
+        data:
+          desc: ''
+          title: Iteration
+          type: iteration
+          selected: false
+          start_node_id: iteration-start-1
+          iterator_selector: [start, items]
+          output_selector: [iter-body, output]
+          parallel: false
+          is_parallel: false
+      - id: iter-body
+        type: custom
+        parentId: iteration
+        position: {x: 60, y: 60}
+        data:
+          desc: ''
+          title: Iteration Body
+          type: template-transform
+          selected: false
+          template: '{{#start.text#}}'
+          variables:
+            - variable: text
+              value_selector: [start, text]
+      - id: loop
+        type: custom
+        position: {x: 620, y: 160}
+        data:
+          desc: ''
+          title: Loop
+          type: loop
+          selected: false
+          start_node_id: loop-start-1
+          loop_count: 3
+          break_conditions: []
+          logical_operator: and
+          output_selector: [loop-body, output]
+      - id: loop-body
+        type: custom
+        parentId: loop
+        position: {x: 60, y: 60}
+        data:
+          desc: ''
+          title: Loop Body
+          type: template-transform
+          selected: false
+          template: tick
+          variables: []
+      - id: loop-exit
+        type: custom
+        parentId: loop
+        position: {x: 320, y: 60}
+        data:
+          desc: ''
+          title: Exit Loop
+          type: exit-loop
+          selected: false
+          conditions:
+            - id: condition-1
+              comparison_operator: is
+              value: stop
+              varType: string
+              variable_selector: [loop-body, output]
+          logical_operator: and
+      - id: end
+        type: custom
+        position: {x: 900, y: 160}
+        data:
+          desc: ''
+          title: Output
+          type: end
+          selected: false
+          outputs:
+            - variable: iterated
+              value_selector: [iteration, output]
+            - variable: looped
+              value_selector: [loop, output]
+    edges:
+      - id: edge-start-iteration
+        type: custom
+        source: start
+        sourceHandle: source
+        target: iteration
+        targetHandle: target
+      - id: edge-iteration-loop
+        type: custom
+        source: iteration
+        sourceHandle: source
+        target: loop
+        targetHandle: target
+      - id: edge-loop-end
+        type: custom
+        source: loop
+        sourceHandle: source
+        target: end
+        targetHandle: target
+      - id: edge-loop-body-exit
+        type: custom
+        source: loop-body
+        sourceHandle: source
+        target: loop-exit
+        targetHandle: target
+        data:
+          isInLoop: true
+    viewport: {x: 0, y: 0, zoom: 1}

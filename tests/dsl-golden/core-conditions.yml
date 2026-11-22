@@ -1,0 +1,127 @@
+app:
+  name: Core Conditions
+  description: IF, ELIF and ELSE branches.
+  icon: 🤖
+  icon_background: '#E4EBFF'
+  mode: workflow
+  use_icon_as_answer_icon: false
+kind: app
+version: 0.4.0
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features: {}
+  graph:
+    nodes:
+      - id: start
+        type: custom
+        position: {x: 60, y: 220}
+        data:
+          desc: ''
+          title: User Input
+          type: start
+          selected: false
+          variables:
+            - variable: count
+              label: Count
+              type: number
+              required: true
+            - variable: name
+              label: Name
+              type: text-input
+              required: false
+              default: guest
+      - id: decide
+        type: custom
+        position: {x: 340, y: 220}
+        data:
+          desc: ''
+          title: Decide
+          type: if-else
+          selected: false
+          cases:
+            - case_id: high
+              logical_operator: and
+              conditions:
+                - id: condition-high-count
+                  comparison_operator: greater
+                  value: 10
+                  varType: number
+                  variable_selector: [start, count]
+                - id: condition-high-name
+                  comparison_operator: not-empty
+                  value: null
+                  varType: string
+                  variable_selector: [start, name]
+            - case_id: fallback
+              logical_operator: or
+              conditions:
+                - id: condition-fallback-count
+                  comparison_operator: less-or-equal
+                  value: 10
+                  varType: number
+                  variable_selector: [start, count]
+                - id: condition-fallback-name
+                  comparison_operator: equals
+                  value: admin
+                  varType: string
+                  variable_selector: [start, name]
+      - id: high-output
+        type: custom
+        position: {x: 660, y: 60}
+        data:
+          desc: ''
+          title: High Output
+          type: end
+          selected: false
+          outputs:
+            - variable: highBranch
+              value_selector: [decide, branch]
+      - id: fallback-output
+        type: custom
+        position: {x: 660, y: 220}
+        data:
+          desc: ''
+          title: Fallback Output
+          type: end
+          selected: false
+          outputs:
+            - variable: fallbackBranch
+              value_selector: [decide, branch]
+      - id: else-output
+        type: custom
+        position: {x: 660, y: 380}
+        data:
+          desc: ''
+          title: Else Output
+          type: end
+          selected: false
+          outputs:
+            - variable: elseBranch
+              value_selector: [decide, branch]
+    edges:
+      - id: edge-start-decide
+        type: custom
+        source: start
+        sourceHandle: source
+        target: decide
+        targetHandle: target
+      - id: edge-decide-high
+        type: custom
+        source: decide
+        sourceHandle: high
+        target: high-output
+        targetHandle: target
+      - id: edge-decide-fallback
+        type: custom
+        source: decide
+        sourceHandle: fallback
+        target: fallback-output
+        targetHandle: target
+      - id: edge-decide-else
+        type: custom
+        source: decide
+        sourceHandle: 'false'
+        target: else-output
+        targetHandle: target
+    viewport: {x: 0, y: 0, zoom: 1}

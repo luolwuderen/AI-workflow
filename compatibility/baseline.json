@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "dify": {
+    "version": "1.9.2",
+    "dslVersion": "0.4.0",
+    "repository": "https://github.com/langgenius/dify"
+  },
+  "difySandbox": {
+    "image": "langgenius/dify-sandbox:0.2.12",
+    "apiPath": "/v1/sandbox/run",
+    "languages": ["python3", "javascript"]
+  },
+  "pluginDaemon": {
+    "version": "0.3.0",
+    "deliveryPhase": 3,
+    "compatible": false
+  },
+  "springAi": "2.1.0",
+  "graphVersion": 1,
+  "policy": "仅对 matrix.json 中显式标记的能力声明兼容，未知 DSL 字段一律拒绝。"
+}

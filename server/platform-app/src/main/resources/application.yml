@@ -1,0 +1,37 @@
+server:
+  port: ${SERVER_PORT:8080}
+spring:
+  application:
+    name: workflow-platform
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/workflow}
+    username: ${DATABASE_USERNAME:workflow}
+    password: ${DATABASE_PASSWORD:workflow}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
+  ai:
+    model:
+      chat: openai
+    retry:
+      max-attempts: 1
+    openai:
+      api-key: ${OPENAI_API_KEY:local-not-required}
+      base-url: ${OPENAI_BASE_URL:http://localhost:8081/v1}
+      chat:
+        options:
+          model: ${OPENAI_MODEL:default}
+workflow:
+  sse:
+    heartbeat-interval: ${SSE_HEARTBEAT_INTERVAL:15s}
+  sandbox:
+    base-url: ${SANDBOX_BASE_URL:http://localhost:8194}
+    api-key: ${SANDBOX_API_KEY:dify-sandbox}
+    timeout: ${SANDBOX_TIMEOUT:10s}
+logging:
+  level:
+    com.acme: INFO
